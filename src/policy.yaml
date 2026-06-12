@@ -1,0 +1,27 @@
+# Gateway policy — change guard behavior here, no code edits needed.
+
+rate_limit:
+  requests_per_minute: 20          # per client IP
+
+input_guards:
+  pii_mask:
+    enabled: true                  # mask PII before it reaches the LLM provider
+  prompt_injection:
+    enabled: true
+    action: block                  # block | flag
+  banned_topics:
+    enabled: true
+    action: block
+    topics:
+      - "insider trading tips"
+      - "weapons manufacturing"
+
+output_guards:
+  pii_leak:
+    enabled: true                  # mask any PII the model echoes back
+  toxicity:
+    enabled: true
+    action: block
+  max_length:
+    enabled: true
+    limit_chars: 8000
