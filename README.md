@@ -5,6 +5,43 @@ request and response — PII masking, prompt-injection blocking, banned-topic
 filtering, toxicity checks, and rate limiting — all configured in YAML,
 no code changes needed.
 
+## Architecture
+
+```
+Client app
+    │
+    │  POST /v1/chat/completions  (OpenAI-compatible)
+    ▼
+┌─────────────────────────────────────────────────────┐
+│                 Guardrails Gateway                  │
+│                                                     │
+│  ┌── INPUT PIPELINE ────────────────────────────┐   │
+│  │  1. Rate limiter     (per-IP token bucket)   │   │
+│  │  2. PII detector     (regex → mask/block)    │   │
+│  │  3. Injection guard  (pattern match → block) │   │
+│  │  4. Topic filter     (banned list → block)   │   │
+│  └──────────────────────────────────────────────┘   │
+│                        │                            │
+│              [request passes]                       │
+│                        ▼                            │
+│            Upstream LLM provider                    │
+│         (Groq / OpenAI / any endpoint)              │
+│                        │                            │
+│  ┌── OUTPUT PIPELINE ───────────────────────────┐   │
+│  │  5. PII detector     (mask echoed PII)       │   │
+│  │  6. Toxicity filter  (wordlist → block)      │   │
+│  │  7. Length limiter   (truncate runaway resp) │   │
+│  └──────────────────────────────────────────────┘   │
+│                        │                            │
+│              Audit log (JSON)                       │
+└─────────────────────────────────────────────────────┘
+    │
+    ▼
+Clean response → client
+```
+
+Every block/mask writes a structured event to `audit.log` with timestamp, guard name, action taken.
+
 ## What it protects against
 
 | Direction | Guard | Action |
